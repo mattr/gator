@@ -208,6 +208,26 @@ func handlerFeeds(s *state, cmd command) error {
 	return nil
 }
 
+func handlerFeedFollow(s *state, cmd command) error {
+	if len(cmd.args) == 0 {
+		return errors.New("follow handler expects a single argument (url)")
+	}
+	user, err := s.db.GetUserByName(context.Background(), s.config.CurrentUserName)
+	if err != nil {
+		return err
+	}
+	feed, err := s.db.GetFeedByURL(context.Background(), cmd.args[0])
+	if err != nil {
+		return err
+	}
+	follow, err := s.db.CreateFeedFollow(context.Background(), database.CreateFeedFollowParams{UserID: user.ID, FeedID: feed.ID})
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%s is following '%s'\n", follow.UserName, follow.FeedName)
+	return nil
+}
+
 func main() {
 	cfg, err := config.Read()
 	if err != nil {
@@ -233,6 +253,7 @@ func main() {
 	c.register("agg", handlerFeed)
 	c.register("addfeed", handlerAddFeed)
 	c.register("feeds", handlerFeeds)
+	c.register("follow", handlerFeedFollow)
 
 	userArgs := os.Args
 	if len(userArgs) < 2 {
