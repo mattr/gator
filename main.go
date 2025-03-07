@@ -180,6 +180,34 @@ func handlerAddFeed(s *state, cmd command) error {
 	return nil
 }
 
+func getUser(users []database.User, id uuid.UUID) (*database.User, error) {
+	for _, user := range users {
+		if user.ID == id {
+			return &user, nil
+		}
+	}
+	return nil, errors.New("user not found")
+}
+
+func handlerFeeds(s *state, cmd command) error {
+	users, err := s.db.GetUsers(context.Background())
+	if err != nil {
+		return err
+	}
+	feeds, err := s.db.GetFeeds(context.Background())
+	if err != nil {
+		return err
+	}
+	for _, feed := range feeds {
+		user, err := getUser(users, feed.UserID)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%s %s %s\n", feed.Name, feed.Url, user.Name)
+	}
+	return nil
+}
+
 func main() {
 	cfg, err := config.Read()
 	if err != nil {
@@ -204,6 +232,7 @@ func main() {
 	c.register("users", handlerUsers)
 	c.register("agg", handlerFeed)
 	c.register("addfeed", handlerAddFeed)
+	c.register("feeds", handlerFeeds)
 
 	userArgs := os.Args
 	if len(userArgs) < 2 {
