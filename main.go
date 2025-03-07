@@ -157,6 +157,29 @@ func handlerFeed(s *state, cmd command) error {
 	return nil
 }
 
+func handlerAddFeed(s *state, cmd command) error {
+	if len(cmd.args) < 2 {
+		return errors.New("add feed handler expects two arguments (name and url)")
+	}
+
+	user, err := s.db.GetUserByName(context.Background(), s.config.CurrentUserName)
+	if err != nil {
+		return err
+	}
+
+	name := cmd.args[0]
+	url := cmd.args[1]
+
+	params := database.CreateFeedParams{ID: uuid.New(), Name: name, Url: url, UserID: user.ID}
+
+	feed, err := s.db.CreateFeed(context.Background(), params)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%v\n", feed)
+	return nil
+}
+
 func main() {
 	cfg, err := config.Read()
 	if err != nil {
@@ -180,6 +203,7 @@ func main() {
 	c.register("reset", handlerReset)
 	c.register("users", handlerUsers)
 	c.register("agg", handlerFeed)
+	c.register("addfeed", handlerAddFeed)
 
 	userArgs := os.Args
 	if len(userArgs) < 2 {
