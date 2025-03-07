@@ -170,12 +170,19 @@ func handlerAddFeed(s *state, cmd command) error {
 	name := cmd.args[0]
 	url := cmd.args[1]
 
-	params := database.CreateFeedParams{ID: uuid.New(), Name: name, Url: url, UserID: user.ID}
+	feedParams := database.CreateFeedParams{ID: uuid.New(), Name: name, Url: url, UserID: user.ID}
 
-	feed, err := s.db.CreateFeed(context.Background(), params)
+	feed, err := s.db.CreateFeed(context.Background(), feedParams)
 	if err != nil {
 		return err
 	}
+
+	followParams := database.CreateFeedFollowParams{ID: uuid.New(), UserID: user.ID, FeedID: feed.ID}
+	_, err = s.db.CreateFeedFollow(context.Background(), followParams)
+	if err != nil {
+		return err
+	}
+
 	fmt.Printf("%v\n", feed)
 	return nil
 }
@@ -220,7 +227,8 @@ func handlerFeedFollow(s *state, cmd command) error {
 	if err != nil {
 		return err
 	}
-	follow, err := s.db.CreateFeedFollow(context.Background(), database.CreateFeedFollowParams{UserID: user.ID, FeedID: feed.ID})
+	params := database.CreateFeedFollowParams{ID: uuid.New(), UserID: user.ID, FeedID: feed.ID}
+	follow, err := s.db.CreateFeedFollow(context.Background(), params)
 	if err != nil {
 		return err
 	}
@@ -239,8 +247,8 @@ func handlerFeedFollowing(s *state, cmd command) error {
 		return err
 	}
 
+	fmt.Printf("%s is following:\n", user.Name)
 	for _, feed := range feeds {
-		fmt.Printf("%s is following:\n", user.Name)
 		fmt.Printf("* %s '%s'\n", feed.Name, feed.Url)
 	}
 	return nil
