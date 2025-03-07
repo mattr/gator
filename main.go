@@ -3,13 +3,17 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 	"github.com/mattr/gator/internal/config"
 	"github.com/mattr/gator/internal/database"
+	"html"
+	"io"
 	"log"
+	"net/http"
 	"os"
 )
 
@@ -25,6 +29,22 @@ type command struct {
 
 type commands struct {
 	available map[string]func(*state, command) error
+}
+
+type RSSFeed struct {
+	Channel struct {
+		Title       string    `xml:"title"`
+		Link        string    `xml:"link"`
+		Description string    `xml:"description"`
+		Item        []RSSItem `xml:"item"`
+	} `xml:"channel"`
+}
+
+type RSSItem struct {
+	Title       string `xml:"title"`
+	Link        string `xml:"link"`
+	Description string `xml:"description"`
+	PubDate     string `xml:"pubDate"`
 }
 
 func (c *commands) register(name string, f func(*state, command) error) {
@@ -91,6 +111,52 @@ func handlerUsers(s *state, cmd command) error {
 	return nil
 }
 
+func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
+	request, err := http.NewRequestWithContext(ctx, "GET", feedURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("User-Agent", "Gator")
+	httpClient := &http.Client{}
+	response, err := httpClient.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code %d", response.StatusCode)
+	}
+	feed := &RSSFeed{}
+	data, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+	err = xml.Unmarshal(data, feed)
+	if err != nil {
+		return nil, err
+	}
+	feed.Channel.Title = html.UnescapeString(feed.Channel.Title)
+	feed.Channel.Description = html.UnescapeString(feed.Channel.Description)
+	for _, item := range feed.Channel.Item {
+		item.Title = html.UnescapeString(item.Title)
+		item.Description = html.UnescapeString(item.Description)
+	}
+	return feed, nil
+}
+
+func handlerFeed(s *state, cmd command) error {
+	//if len(cmd.args) == 0 {
+	//	return errors.New("feed handler expects a single argument (url)")
+	//}
+	//feedURL := cmd.args[0]
+	feed, err := fetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%v\n", *feed)
+	return nil
+}
+
 func main() {
 	cfg, err := config.Read()
 	if err != nil {
@@ -113,6 +179,7 @@ func main() {
 	c.register("register", handlerRegister)
 	c.register("reset", handlerReset)
 	c.register("users", handlerUsers)
+	c.register("agg", handlerFeed)
 
 	userArgs := os.Args
 	if len(userArgs) < 2 {
