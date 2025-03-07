@@ -72,6 +72,10 @@ func handlerRegister(s *state, cmd command) error {
 	return nil
 }
 
+func handlerReset(s *state, cmd command) error {
+	return s.db.DeleteAllUsers(context.Background())
+}
+
 func main() {
 	cfg, err := config.Read()
 	if err != nil {
@@ -92,6 +96,7 @@ func main() {
 	c := commands{available: make(map[string]func(*state, command) error, 3)}
 	c.register("login", handlerLogin)
 	c.register("register", handlerRegister)
+	c.register("reset", handlerReset)
 
 	userArgs := os.Args
 	if len(userArgs) < 2 {
