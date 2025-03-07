@@ -228,6 +228,24 @@ func handlerFeedFollow(s *state, cmd command) error {
 	return nil
 }
 
+func handlerFeedFollowing(s *state, cmd command) error {
+	user, err := s.db.GetUserByName(context.Background(), s.config.CurrentUserName)
+	if err != nil {
+		return err
+	}
+
+	feeds, err := s.db.GetFeedsForUser(context.Background(), user.ID)
+	if err != nil {
+		return err
+	}
+
+	for _, feed := range feeds {
+		fmt.Printf("%s is following:\n", user.Name)
+		fmt.Printf("* %s '%s'\n", feed.Name, feed.Url)
+	}
+	return nil
+}
+
 func main() {
 	cfg, err := config.Read()
 	if err != nil {
@@ -254,6 +272,7 @@ func main() {
 	c.register("addfeed", handlerAddFeed)
 	c.register("feeds", handlerFeeds)
 	c.register("follow", handlerFeedFollow)
+	c.register("following", handlerFeedFollowing)
 
 	userArgs := os.Args
 	if len(userArgs) < 2 {
