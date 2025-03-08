@@ -35,7 +35,8 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const deleteAllUsers = `-- name: DeleteAllUsers :exec
-delete from users
+delete
+from users
 `
 
 // noinspection SqlWithoutWhere
