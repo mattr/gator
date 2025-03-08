@@ -18,3 +18,16 @@ from feeds
          inner join feed_follows on feed_follows.feed_id = feeds.id
          inner join users on users.id = feed_follows.user_id
 where users.id = $1;
+
+-- name: MarkFeedFetched :one
+update feeds
+set updated_at      = now(),
+    last_fetched_at = now()
+where id = $1
+returning id, created_at, updated_at, name, url, user_id, last_fetched_at;
+
+-- name: GetNextFeedToFetch :one
+select id, created_at, updated_at, name, url, user_id, last_fetched_at
+from feeds
+order by last_fetched_at asc nulls first
+limit 1;

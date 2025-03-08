@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/mattr/gator/internal/database"
+	"time"
 )
 
 // handlerLogin provides a handler function for selecting a user as the current user.
@@ -75,19 +76,49 @@ func handlerUsers(s *state, cmd command) error {
 	return nil
 }
 
-// handlerFeed fetches a feed from a URL and stores it's configuration in the database.
+// handlerAggregator fetches a feed from a URL and stores it's configuration in the database.
 //
 // Invoked with the agg argument
-func handlerFeed(s *state, cmd command) error {
-	//if len(cmd.args) == 0 {
-	//	return errors.New("feed handler expects a single argument (url)")
-	//}
-	//feedURL := cmd.args[0]
-	feed, err := fetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
+func handlerAggregator(s *state, cmd command) error {
+	if len(cmd.args) == 0 {
+		return errors.New("aggregator handler expects a single argument (time_between_reqs)")
+	}
+
+	duration, err := time.ParseDuration(cmd.args[0])
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%v\n", *feed)
+
+	ticker := time.NewTicker(duration)
+	for ; ; <-ticker.C {
+		err = scrapeFeeds(s)
+		if err != nil {
+			return err
+		}
+	}
+}
+
+func scrapeFeeds(s *state) error {
+	nextFeed, err := s.db.GetNextFeedToFetch(context.Background())
+	if err != nil {
+		return err
+	}
+
+	nextFeed, err = s.db.MarkFeedFetched(context.Background(), nextFeed.ID)
+	if err != nil {
+		return err
+	}
+
+	feed, err := fetchFeed(context.Background(), nextFeed.Url)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Latest articles from %s\n", feed.Channel.Title)
+	for _, item := range feed.Channel.Item {
+		fmt.Printf("* \"%s\": %s\n", item.Title, item.Link)
+	}
+	fmt.Println("")
 	return nil
 }
 
