@@ -180,3 +180,15 @@ func handlerFeedFollowing(s *state, cmd command, user database.User) error {
 	}
 	return nil
 }
+
+// handlerFeedUnfollow removes a feed from the current user's follows
+//
+// Invoked with the unfollow argument.
+func handlerFeedUnfollow(s *state, cmd command, user database.User) error {
+	if len(cmd.args) == 0 {
+		return errors.New("unfollow handler expects a single argument (url)")
+	}
+
+	params := database.DeleteFeedFollowParams{UserID: user.ID, Url: cmd.args[0]}
+	return s.db.DeleteFeedFollow(context.Background(), params)
+}
