@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/mattr/gator/internal/database"
+	"strconv"
 	"time"
 )
 
@@ -91,35 +92,11 @@ func handlerAggregator(s *state, cmd command) error {
 
 	ticker := time.NewTicker(duration)
 	for ; ; <-ticker.C {
-		err = scrapeFeeds(s)
+		err := scrapeFeeds(s)
 		if err != nil {
 			return err
 		}
 	}
-}
-
-func scrapeFeeds(s *state) error {
-	nextFeed, err := s.db.GetNextFeedToFetch(context.Background())
-	if err != nil {
-		return err
-	}
-
-	nextFeed, err = s.db.MarkFeedFetched(context.Background(), nextFeed.ID)
-	if err != nil {
-		return err
-	}
-
-	feed, err := fetchFeed(context.Background(), nextFeed.Url)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("Latest articles from %s\n", feed.Channel.Title)
-	for _, item := range feed.Channel.Item {
-		fmt.Printf("* \"%s\": %s\n", item.Title, item.Link)
-	}
-	fmt.Println("")
-	return nil
 }
 
 // handlerFeeds lists all feeds currently stored in the database
@@ -222,4 +199,22 @@ func handlerFeedUnfollow(s *state, cmd command, user database.User) error {
 
 	params := database.DeleteFeedFollowParams{UserID: user.ID, Url: cmd.args[0]}
 	return s.db.DeleteFeedFollow(context.Background(), params)
+}
+
+func handlerBrowse(s *state, cmd command, user database.User) error {
+	limit := 2
+
+	if len(cmd.args) > 0 {
+		limit, _ = strconv.Atoi(cmd.args[0])
+	}
+
+	params := database.GetPostsForUserParams{UserID: user.ID, Limit: int32(limit)}
+	posts, err := s.db.GetPostsForUser(context.Background(), params)
+	if err != nil {
+		return err
+	}
+	for _, post := range posts {
+		fmt.Printf("[%s] \"%s\": %s\n", post.FeedName, post.Title, post.Url)
+	}
+	return nil
 }

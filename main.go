@@ -47,6 +47,7 @@ func registerCommands(c *commands) {
 	c.register("follow", middlewareLoggedIn(handlerFeedFollow))
 	c.register("following", middlewareLoggedIn(handlerFeedFollowing))
 	c.register("unfollow", middlewareLoggedIn(handlerFeedUnfollow))
+	c.register("browse", middlewareLoggedIn(handlerBrowse))
 }
 
 func main() {

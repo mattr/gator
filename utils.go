@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"html"
 	"io"
 	"net/http"
+	"time"
 )
 
 // fetchFeed fetches the feed from the provided URL and creates a new RSSFeed object
@@ -55,4 +57,44 @@ func getUser(users []database.User, id uuid.UUID) (*database.User, error) {
 		}
 	}
 	return nil, errors.New("user not found")
+}
+
+func scrapeFeeds(s *state) error {
+	nextFeed, err := s.db.GetNextFeedToFetch(context.Background())
+	if err != nil {
+		return err
+	}
+
+	nextFeed, err = s.db.MarkFeedFetched(context.Background(), nextFeed.ID)
+	if err != nil {
+		return err
+	}
+
+	feed, err := fetchFeed(context.Background(), nextFeed.Url)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Latest articles from %s\n", feed.Channel.Title)
+	for _, item := range feed.Channel.Item {
+		// TODO: Handle additional formats for publishedAt
+		publishedAt, _ := time.Parse(time.RFC3339, item.PubDate)
+		params := database.CreatePostParams{
+			ID:          uuid.New(),
+			Title:       item.Title,
+			Url:         item.Link,
+			Description: sql.NullString{String: item.Description, Valid: true},
+			PublishedAt: sql.NullTime{Time: publishedAt, Valid: true},
+			FeedID:      nextFeed.ID,
+		}
+		_, err := s.db.CreatePost(context.Background(), params)
+		if err != nil {
+			// ignore duplicate urls
+			if err.Error() == "pq: duplicate key value violates unique constraint \"posts_url_key\"" {
+				continue
+			}
+			fmt.Println("Error creating post:", err)
+		}
+	}
+	return nil
 }
